@@ -10,15 +10,20 @@ import java.util.Properties;
 public class ProducerApp {
 
     // Configuration constants
-    private static final String KAFKA_SERVERS = "kafka:9092";
-    private static final String KAFKA_TOPIC = "fraud-transactions";
-    private static final String TEST_DATA_PATH = "src/main/resources/fraudTest.csv";
+    private static final String KAFKA_BOOTSTRAP_SERVERS = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "kafka1:9092");
+    private static final String KAFKA_TOPIC = System.getenv().getOrDefault("KAFKA_TOPIC", "fraud-transactions");
+    private static final String TEST_DATA_PATH = System.getenv().getOrDefault("TEST_DATA_PATH", "src/main/resources/fraudTest.csv");
+
 
     public static void main(String[] args) throws Exception {
 
+        Thread.sleep(60000);
+
+        System.out.println("Starting data producer...");
+
         // Configure Kafka Producer
         Properties props = new Properties();
-        props.put("bootstrap.servers", KAFKA_SERVERS); // To search the Kafka Broker
+        props.put("bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS); // To search the Kafka Broker
         props.put("key.serializer", StringSerializer.class.getName()); // To convert from key to byte
         props.put("value.serializer", StringSerializer.class.getName()); // To convert from byte to value
 
@@ -30,6 +35,8 @@ public class ProducerApp {
 
         // Try to open a BufferedReader to the given path
         try (BufferedReader reader = Files.newBufferedReader(path)) {
+            
+            reader.readLine(); // Skip the first line (header)
 
             // Read line by line the test data, send each of them to the Kafka Broker 
             String line;
