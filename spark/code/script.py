@@ -14,6 +14,15 @@ spark = SparkSession.builder \
     .config("spark.sql.streaming.checkpointLocation", "/tmp/checkpoint") \
     .config("spark.sql.adaptive.enabled", "true") \
     .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
+    .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.iceberg.type", "hadoop") \
+    .config("spark.sql.catalog.iceberg.warehouse", "s3a://warehouse/") \
+    .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.hadoop.HadoopFileIO") \
+    .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
+    .config("spark.hadoop.fs.s3a.access.key", "admin") \
+    .config("spark.hadoop.fs.s3a.secret.key", "password") \
+    .config("spark.hadoop.fs.s3a.path.style.access", "true") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
@@ -31,12 +40,58 @@ except Exception as e:
 
 print("Starting Kafka stream...")
 
+spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.default")
+
+spark.sql("""
+CREATE TABLE IF NOT EXISTS iceberg.default.fraud_results (
+    index INT,
+    trans_date_trans_time TIMESTAMP,
+    cc_num STRING,
+    merchant STRING,
+    category STRING,
+    amt DOUBLE,
+    first STRING,
+    last STRING,
+    gender STRING,
+    street STRING,
+    city STRING,
+    state STRING,
+    zip STRING,
+    lat DOUBLE,
+    long DOUBLE,
+    city_pop BIGINT,
+    job STRING,
+    dob DATE,
+    trans_num STRING,
+    unix_time BIGINT,
+    merch_lat DOUBLE,
+    merch_long DOUBLE,
+    age BIGINT,
+    hour BIGINT,
+    day_of_week INT,
+    is_night BOOLEAN,
+    is_weekend BOOLEAN,
+    distance_user_to_merch DOUBLE,
+    log_amt DOUBLE,
+    log_city_pop DOUBLE,
+    log_distance DOUBLE,
+    user_id STRING,
+    tx_count_user INT,
+    amt_mean_user DOUBLE,
+    fraud_probability DOUBLE,
+    fraud_prediction INT
+)
+USING iceberg
+""")
+
+
 # Legge lo stream da Kafka
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka1:9092,kafka2:9092,kafka3:9092") \
     .option("subscribe", "fraud-transactions") \
     .option("startingOffsets", "earliest") \
+    .option("maxOffsetsPerTrigger", 3000) \
     .option("failOnDataLoss", "false") \
     .load()
 
@@ -116,14 +171,16 @@ def preprocess_and_predict(batch_df, batch_id):
         # Convert to Pandas per mantenere logica identica
         pandas_df = batch_df.toPandas()
         
+        pandas_df['index'] = pandas_df['index'].astype(int)
+
         # Applica la funzione originale (adattata)
         pandas_df['dob'] = pd.to_datetime(pandas_df['dob'])
         pandas_df['trans_date_trans_time'] = pd.to_datetime(pandas_df['trans_date_trans_time'])
         pandas_df['age'] = (pandas_df['trans_date_trans_time'] - pandas_df['dob']).dt.days // 365
         pandas_df['hour'] = pandas_df['trans_date_trans_time'].dt.hour
         pandas_df['day_of_week'] = pandas_df['trans_date_trans_time'].dt.dayofweek
-        pandas_df['is_night'] = pandas_df['hour'].apply(lambda x: 1 if x < 6 or x >= 22 else 0)
-        pandas_df['is_weekend'] = pandas_df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)
+        pandas_df['is_night'] = pandas_df['hour'].apply(lambda x: 1 if x < 6 or x >= 22 else 0).astype(bool)
+        pandas_df['is_weekend'] = pandas_df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0).astype(bool)
         
         # Distanza (assumendo che haversine sia disponibile)
         pandas_df['distance_user_to_merch'] = pandas_df.apply(
@@ -167,8 +224,8 @@ def preprocess_and_predict(batch_df, batch_id):
 
         result_df = spark.createDataFrame(pandas_df)
 
-        result_df.select(col("trans_date_trans_time"), col("merchant"), col("amt"), col("first"), col("last"), col("city"), col("fraud_prediction"), col("fraud_probability")).show(10, truncate=False)
-
+        result_df.writeTo("iceberg.default.fraud_results").append()
+    
     except Exception as e:
         print(f"Error processing batch {batch_id}: {str(e)}")
 

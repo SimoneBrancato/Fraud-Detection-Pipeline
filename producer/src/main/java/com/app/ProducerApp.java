@@ -47,7 +47,7 @@ public class ProducerApp {
                 producer.send(new ProducerRecord<>(KAFKA_TOPIC, key, line));
                 // System.out.println("Sent: " + line);
                 i++;
-                Thread.sleep(10); // To simulate a real-time data flow
+                Thread.sleep(100); // To simulate a real-time data flow
             }
         }
 
