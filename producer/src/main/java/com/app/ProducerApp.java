@@ -38,12 +38,16 @@ public class ProducerApp {
             
             reader.readLine(); // Skip the first line (header)
 
+            int i = 0;
+
             // Read line by line the test data, send each of them to the Kafka Broker 
             String line;
             while ((line = reader.readLine()) != null) {
-                producer.send(new ProducerRecord<>(KAFKA_TOPIC, line));
-                System.out.println("Sent: " + line);
-                Thread.sleep(1000); // To simulate a real-time data flow
+                String key = "key-" + i;
+                producer.send(new ProducerRecord<>(KAFKA_TOPIC, key, line));
+                // System.out.println("Sent: " + line);
+                i++;
+                Thread.sleep(10); // To simulate a real-time data flow
             }
         }
 

@@ -31,7 +31,7 @@ services:
       KAFKA_KRAFT_CLUSTER_ID: Nru2U1JQQT-RKA0UapBN3w
       ALLOW_PLAINTEXT_LISTENER: yes
     volumes:
-      - ./kafka/data/broker1:/bitnami/kafka
+      - kafka1_data:/bitnami/kafka
 
   kafka2:
     image: bitnami/kafka:3.7.0
@@ -50,7 +50,7 @@ services:
       KAFKA_KRAFT_CLUSTER_ID: Nru2U1JQQT-RKA0UapBN3w
       ALLOW_PLAINTEXT_LISTENER: yes
     volumes:
-      - ./kafka/data/broker2:/bitnami/kafka
+      - kafka2_data:/bitnami/kafka
 
   kafka3:
     image: bitnami/kafka:3.7.0
@@ -69,7 +69,7 @@ services:
       KAFKA_KRAFT_CLUSTER_ID: Nru2U1JQQT-RKA0UapBN3w
       ALLOW_PLAINTEXT_LISTENER: yes
     volumes:
-      - ./kafka/data/broker3:/bitnami/kafka
+      - kafka3_data:/bitnami/kafka
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2
@@ -86,6 +86,7 @@ services:
 
   kafka-init:
     image: bitnami/kafka:3.7.0
+    container_name: kafka-init
     depends_on:
       - kafka1
       - kafka2
@@ -97,44 +98,99 @@ services:
       KAFKA_BOOTSTRAP_SERVER: kafka1:9092
     command: ["/bin/bash", "/init-topic.sh"]
 
-  #spark:
-  #  image: bitnami/spark:latest
-  #  container_name: spark-master
-  #  ports:
-  #    - 4040:4040
-  #    - 7077:7077
-  #  environment:
-  #    - SPARK_MODE=master
-  #    - HOME=/tmp/spark-home
-  #  volumes:
-  #    - ./spark/home:/tmp/spark-home
-  #    - ./spark:/spark
-  #  command: >
-  #        /opt/bitnami/spark/bin/spark-submit
-  #        --driver-memory 2g 
-  #        --executor-memory 2g
-  #        --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/tmp -Divy.home=/tmp -XX:+UseG1GC"
-  #        --conf spark.executor.extraJavaOptions="-XX:+UseG1GC"
-  #        --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1  
-  #        /spark/script.py
+  spark-master:
+    image: bitnami/spark:3.5
+    container_name: spark-master
+    ports:
+      - 4040:4040
+      - 7077:7077
+      - 8081:8080
+    environment:
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
+      SPARK_RPC_ENCRYPTION_ENABLED: no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
+      SPARK_SSL_ENABLED: no
+      HOME: /tmp/spark-home
+    volumes:
+      - ./spark/code:/opt/bitnami/spark/apps
+      - spark_data:/opt/bitnami/spark/data
+      - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
 
-  #spark-worker-1:
-  #  image: bitnami/spark:latest
-  #  container_name: spark-worker-1
-  #  environment:
-  #    - SPARK_MODE=worker
-  #    - SPARK_MASTER_URL=spark://spark:7077
-  #  depends_on:
-  #    - spark
+  spark-worker-1:
+    image: bitnami/spark:3.5
+    container_name: spark-worker-1
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 3G
+      SPARK_WORKER_CORES: 1
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
+      SPARK_RPC_ENCRYPTION_ENABLED: no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
+      SPARK_SSL_ENABLED: no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark/code:/opt/bitnami/spark/apps
+      - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
+    command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+   
 
-  #spark-worker-2:
-  #  image: bitnami/spark:latest
-  #  container_name: spark-worker-2
-  #  environment:
-  #    - SPARK_MODE=worker
-  #    - SPARK_MASTER_URL=spark://spark:7077
-  #  depends_on:
-  #    - spark
+  spark-worker-2:
+    image: bitnami/spark:3.5
+    container_name: spark-worker-2
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 3G
+      SPARK_WORKER_CORES: 1
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
+      SPARK_RPC_ENCRYPTION_ENABLED: no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
+      SPARK_SSL_ENABLED: no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark/code:/opt/bitnami/spark/apps
+      - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
+    command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+
+  spark-worker-3:
+    image: bitnami/spark:3.5
+    container_name: spark-worker-3
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 3G
+      SPARK_WORKER_CORES: 1
+      SPARK_RPC_AUTHENTICATION_ENABLED: no
+      SPARK_RPC_ENCRYPTION_ENABLED: no
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
+      SPARK_SSL_ENABLED: no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark/code:/opt/bitnami/spark/apps
+      - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
+    command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+
+  spark-submit:
+    image: bitnami/spark:3.5
+    container_name: spark-submit
+    depends_on:
+      - spark-master
+      - spark-worker-1
+      - spark-worker-2
+      - spark-worker-3
+    environment:
+      - PYTHONPATH=/opt/bitnami/python/lib/python3.9/site-packages
+    volumes:
+      - ./spark/code:/opt/bitnami/spark/apps
+      - spark_data:/opt/bitnami/spark/data
+      - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
+    command: ["/opt/bitnami/spark/apps/submit.sh"]
+    restart: no
 
 
   #minio:
@@ -168,3 +224,9 @@ services:
   #  environment:
   #    - GF_SECURITY_ADMIN_USER=admin
   #    - GF_SECURITY_ADMIN_PASSWORD=admin123
+
+volumes:
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:
+  spark_data:
