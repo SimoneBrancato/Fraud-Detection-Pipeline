@@ -36,7 +36,7 @@ df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka1:9092,kafka2:9092,kafka3:9092") \
     .option("subscribe", "fraud-transactions") \
-    .option("startingOffsets", "latest") \
+    .option("startingOffsets", "earliest") \
     .option("failOnDataLoss", "false") \
     .load()
 
@@ -153,12 +153,9 @@ def preprocess_and_predict(batch_df, batch_id):
         processed_df = pandas_df[required_columns]
 
         # Applica il modello
-        predictions = model_pipeline.predict(processed_df)
-        probabilities = model_pipeline.predict_proba(processed_df)
-        
-        # Aggiungi predizioni al DataFrame
-        pandas_df['fraud_prediction'] = predictions
-        pandas_df['fraud_probability'] = probabilities[:, 1]
+        threshold = 0.3     # In Fraud Detection: Recall >> Precision
+        pandas_df['fraud_probability'] =  model_pipeline.predict_proba(processed_df)[:, 1]
+        pandas_df['fraud_prediction'] = (pandas_df['fraud_probability'] >= threshold).astype(int)
 
         fraud_transactions = pandas_df.query('fraud_prediction == 1')
 
