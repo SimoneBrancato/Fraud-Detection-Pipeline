@@ -1,14 +1,10 @@
-#!/bin/sh
-
-set -e
-
-# Inizializzazione client
+#!/bin/bash
 mc alias set myminio http://localhost:9000 admin password
 
-# Crea il bucket solo se non esiste
-if ! mc ls myminio | grep -q warehouse; then
-  echo "📦 Creo il bucket warehouse..."
-  mc mb myminio/warehouse
+# Check if bucket exists before creating
+if ! mc ls myminio/warehouse > /dev/null 2>&1; then
+    echo "📦 Creating bucket warehouse..."
+    mc mb myminio/warehouse
 else
-  echo "✅ Il bucket warehouse esiste già."
+    echo "📦 Bucket warehouse already exists"
 fi
