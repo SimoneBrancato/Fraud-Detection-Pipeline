@@ -232,6 +232,7 @@ def preprocess_and_predict(batch_df, batch_id):
 print("Starting stream processing...")
 
 query = df_csv.writeStream \
+    .format("iceberg") \
     .foreachBatch(preprocess_and_predict) \
     .trigger(processingTime='10 seconds') \
     .start() \
