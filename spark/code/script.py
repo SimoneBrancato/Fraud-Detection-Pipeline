@@ -1,9 +1,11 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_csv
+from pyspark.sql.functions import col, from_csv, when, isnan, isnull
+from pyspark.sql.types import *
 import math
 import joblib
 import pandas as pd
 import numpy as np
+import requests
 
 print("=== Fraud Detection with XGBoost ===")
 
@@ -14,15 +16,6 @@ spark = SparkSession.builder \
     .config("spark.sql.streaming.checkpointLocation", "/tmp/checkpoint") \
     .config("spark.sql.adaptive.enabled", "true") \
     .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
-    .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog") \
-    .config("spark.sql.catalog.iceberg.type", "hadoop") \
-    .config("spark.sql.catalog.iceberg.warehouse", "s3a://warehouse/") \
-    .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.hadoop.HadoopFileIO") \
-    .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
-    .config("spark.hadoop.fs.s3a.access.key", "admin") \
-    .config("spark.hadoop.fs.s3a.secret.key", "password") \
-    .config("spark.hadoop.fs.s3a.path.style.access", "true") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
@@ -38,52 +31,88 @@ except Exception as e:
     print(f"✗ Error loading model: {e}")
     exit(1)
 
+
+def initialize_clickhouse_table():
+
+    create_table_sql = """
+        CREATE TABLE IF NOT EXISTS fraud_predictions (
+            idx Int32,
+            trans_date_trans_time DateTime,
+            cc_num String,
+            merchant String,
+            category String,
+            amt Float64,
+            first String,
+            last String,
+            gender String,
+            street String,
+            city String,
+            state String,
+            zip String,
+            lat Float64,
+            long Float64,
+            city_pop Int64,
+            job String,
+            dob Date32,
+            trans_num String,
+            unix_time Int64,
+            merch_lat Float64,
+            merch_long Float64,
+            age Int64,
+            hour Int64,
+            day_of_week Int32,
+            is_night UInt8,
+            is_weekend UInt8,
+            distance_user_to_merch Float64,
+            log_amt Float64,
+            log_city_pop Float64,
+            log_distance Float64,
+            user_id String,
+            tx_count_user Int32,
+            amt_mean_user Float64,
+            fraud_probability Float64,
+            fraud_prediction Int32,
+            inserted_at DateTime DEFAULT now()
+        )
+        ENGINE = MergeTree
+        PARTITION BY toYYYYMM(trans_date_trans_time)
+        PRIMARY KEY (trans_date_trans_time, idx)
+        ORDER BY (trans_date_trans_time, idx)
+        SETTINGS index_granularity = 8192
+        """
+
+    check_table_sql = "EXISTS TABLE fraud_predictions"
+    check_table_response = requests.post(
+        "http://clickhouse:8123",
+        data=check_table_sql,
+        auth=('default', 'password'),
+        headers={'Content-Type': 'text/plain'}
+    )
+
+    if check_table_response.status_code == 200:
+        table_exists = check_table_response.text.strip() == '1'
+        if table_exists:
+            print("✅ Tabella fraud_predictions già esistente")
+            return True
+
+    print("🔨 Creando tabella fraud_predictions con tutte le colonne...")
+    response = requests.post(
+        "http://clickhouse:8123",
+        data=create_table_sql,
+        auth=('default', 'password'),
+        headers={'Content-Type': 'text/plain'}
+    )
+
+    if response.status_code == 200:
+        print("✅ Tabella fraud_predictions creata con successo")
+        return True
+    else:
+        print(f"❌ Errore creazione tabella: {response.text}")
+        return False
+
+initialize_clickhouse_table()
+
 print("Starting Kafka stream...")
-
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.default")
-
-spark.sql("""
-CREATE TABLE IF NOT EXISTS iceberg.default.fraud_results (
-    index INT,
-    trans_date_trans_time TIMESTAMP,
-    cc_num STRING,
-    merchant STRING,
-    category STRING,
-    amt DOUBLE,
-    first STRING,
-    last STRING,
-    gender STRING,
-    street STRING,
-    city STRING,
-    state STRING,
-    zip STRING,
-    lat DOUBLE,
-    long DOUBLE,
-    city_pop BIGINT,
-    job STRING,
-    dob DATE,
-    trans_num STRING,
-    unix_time BIGINT,
-    merch_lat DOUBLE,
-    merch_long DOUBLE,
-    age BIGINT,
-    hour BIGINT,
-    day_of_week INT,
-    is_night BOOLEAN,
-    is_weekend BOOLEAN,
-    distance_user_to_merch DOUBLE,
-    log_amt DOUBLE,
-    log_city_pop DOUBLE,
-    log_distance DOUBLE,
-    user_id STRING,
-    tx_count_user INT,
-    amt_mean_user DOUBLE,
-    fraud_probability DOUBLE,
-    fraud_prediction INT
-)
-USING iceberg
-""")
-
 
 # Legge lo stream da Kafka
 df = spark.readStream \
@@ -108,7 +137,7 @@ csv_schema_str = "index string, trans_date_trans_time string, cc_num string," \
 df_csv = parsed_df.select(
     from_csv(col("value"), csv_schema_str, {"header": "false", "inferSchema": "false"}).alias("csv_data")
 ).select(
-    col("csv_data.index").alias("index"),
+    col("csv_data.index").alias("idx"),
     col("csv_data.trans_date_trans_time").alias("trans_date_trans_time"),
     col("csv_data.cc_num").alias("cc_num"),
     col("csv_data.merchant").alias("merchant"),
@@ -171,7 +200,7 @@ def preprocess_and_predict(batch_df, batch_id):
         # Convert to Pandas per mantenere logica identica
         pandas_df = batch_df.toPandas()
         
-        pandas_df['index'] = pandas_df['index'].astype(int)
+        pandas_df['idx'] = pandas_df['idx'].astype(int)
 
         # Applica la funzione originale (adattata)
         pandas_df['dob'] = pd.to_datetime(pandas_df['dob'])
@@ -179,8 +208,8 @@ def preprocess_and_predict(batch_df, batch_id):
         pandas_df['age'] = (pandas_df['trans_date_trans_time'] - pandas_df['dob']).dt.days // 365
         pandas_df['hour'] = pandas_df['trans_date_trans_time'].dt.hour
         pandas_df['day_of_week'] = pandas_df['trans_date_trans_time'].dt.dayofweek
-        pandas_df['is_night'] = pandas_df['hour'].apply(lambda x: 1 if x < 6 or x >= 22 else 0).astype(bool)
-        pandas_df['is_weekend'] = pandas_df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0).astype(bool)
+        pandas_df['is_night'] = pandas_df['hour'].apply(lambda x: 1 if x < 6 or x >= 22 else 0).astype(int)
+        pandas_df['is_weekend'] = pandas_df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0).astype(int)
         
         # Distanza (assumendo che haversine sia disponibile)
         pandas_df['distance_user_to_merch'] = pandas_df.apply(
@@ -215,24 +244,33 @@ def preprocess_and_predict(batch_df, batch_id):
         pandas_df['fraud_prediction'] = (pandas_df['fraud_probability'] >= threshold).astype(int)
 
         fraud_transactions = pandas_df.query('fraud_prediction == 1')
-
         if len(fraud_transactions) > 0:
             print(f"🚨 FRAUD ALERT: {len(fraud_transactions)} fraudulent transactions detected!")
-            print(fraud_transactions[['merchant', 'amt', 'fraud_probability']].to_string(index=False))
         else:
             print("\n✅ No fraud detected in this batch")
 
         result_df = spark.createDataFrame(pandas_df)
 
-        result_df.writeTo("iceberg.default.fraud_results").append()
-    
+        if result_df.count() == 0:
+            print("⚠️ DataFrame vuoto, salto il batch")
+            return
+        
+        result_df.write \
+            .format("jdbc") \
+            .option("url", "jdbc:clickhouse://clickhouse:8123/default") \
+            .option("driver", "com.clickhouse.jdbc.ClickHouseDriver") \
+            .option("dbtable", "fraud_predictions") \
+            .option("user", "default") \
+            .option("password", "password") \
+            .mode("append") \
+            .save()
+
     except Exception as e:
         print(f"Error processing batch {batch_id}: {str(e)}")
 
 print("Starting stream processing...")
 
 query = df_csv.writeStream \
-    .format("iceberg") \
     .foreachBatch(preprocess_and_predict) \
     .trigger(processingTime='10 seconds') \
     .start() \

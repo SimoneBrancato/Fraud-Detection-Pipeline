@@ -107,21 +107,16 @@ services:
       - 8081:8080
     environment:
       SPARK_MODE: master
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY=: password
       SPARK_RPC_AUTHENTICATION_ENABLED: no
       SPARK_RPC_ENCRYPTION_ENABLED: no
       SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
       SPARK_SSL_ENABLED: no
       HOME: /tmp/spark-home
-    depends_on:
-      - minio
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - spark_data:/opt/bitnami/spark/data
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./jars:/opt/spark/jars
+      - ./spark/jars:/opt/spark/jars
 
   spark-worker-1:
     image: bitnami/spark:3.5
@@ -129,8 +124,6 @@ services:
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: password
       SPARK_WORKER_MEMORY: 3G
       SPARK_WORKER_CORES: 1
       SPARK_RPC_AUTHENTICATION_ENABLED: no
@@ -139,11 +132,11 @@ services:
       SPARK_SSL_ENABLED: no
     depends_on:
       - spark-master
+      - clickhouse
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./jars:/opt/spark/jars
+      - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
    
 
@@ -153,8 +146,6 @@ services:
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: password
       SPARK_WORKER_MEMORY: 3G
       SPARK_WORKER_CORES: 1
       SPARK_RPC_AUTHENTICATION_ENABLED: no
@@ -163,11 +154,11 @@ services:
       SPARK_SSL_ENABLED: no
     depends_on:
       - spark-master
+      - clickhouse
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./jars:/opt/spark/jars
+      - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
 
   spark-worker-3:
@@ -176,8 +167,6 @@ services:
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY: password
       SPARK_WORKER_MEMORY: 3G
       SPARK_WORKER_CORES: 1
       SPARK_RPC_AUTHENTICATION_ENABLED: no
@@ -186,11 +175,11 @@ services:
       SPARK_SSL_ENABLED: no
     depends_on:
       - spark-master
+      - clickhouse
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./jars:/opt/spark/jars
+      - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
 
   spark-submit:
@@ -201,48 +190,56 @@ services:
       - spark-worker-1
       - spark-worker-2
       - spark-worker-3
+      - clickhouse
     environment:
       PYTHONPATH: /opt/bitnami/python/lib/python3.9/site-packages
-      AWS_REGION: us-east-1
-      AWS_DEFAULT_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: admin
-      AWS_SECRET_ACCESS_KEY=: password
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - spark_data:/opt/bitnami/spark/data
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
-      - ./spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
-      - ./jars:/opt/spark/jars
+      - ./spark/jars:/opt/spark/jars
     command: ["/opt/bitnami/spark/apps/submit.sh"]
     restart: no
 
-  minio:
-    image: minio/minio
-    container_name: minio
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
     ports:
+      - 8123:8123
       - 9000:9000
-      - 9001:9001
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password
-      MINIO_DOMAIN: storage
-      MINIO_REGION_NAME: us-east-1
-      MINIO_REGION: us-east-1
-    command: server /data --console-address ":9001"
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DB: default
     volumes:
-      - minio_data:/data
-      - ./minio:/minio
-    entrypoint: >
-      sh -c "
-        /usr/bin/minio server /data --console-address ':9001' &
-        sleep 5 &&
-        /minio/create-bucket.sh &&
-        wait
-      "
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/config/users.xml:/etc/clickhouse-server/users.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  grafana:
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile
+    container_name: grafana
+    ports:
+      - 3000:3000
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - clickhouse
 
 volumes:
   kafka1_data:
   kafka2_data:
   kafka3_data:
   spark_data:
-  minio_data:
+  clickhouse_data:
+  grafana_data:
+
