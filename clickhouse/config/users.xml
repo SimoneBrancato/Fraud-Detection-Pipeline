@@ -1,12 +1,12 @@
 <yandex>
   <users>
-    <grafana>
-      <password>grafana123</password>
+    <default>
+      <password>password</password>
       <networks>
         <ip>::/0</ip>
       </networks>
       <profile>default</profile>
       <quota>default</quota>
-    </grafana>
+    </default>
   </users>
 </yandex>

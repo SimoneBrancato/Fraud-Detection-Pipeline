@@ -5,10 +5,20 @@ datasources:
     type: vertamedia-clickhouse-datasource
     access: proxy
     url: http://clickhouse:8123
-    basicAuth: false
-    jsonData:
-      username: grafana
-    secureJsonData:
-      password: grafana123
+    basicAuth: true
+    basicAuthUser: default
+    basicAuthPassword: password
+    withCredentials: true
     isDefault: true
     editable: true
+    jsonData:
+      defaultDatabase: default
+      addCorsHeader: false
+      usePOST: false
+      defaultDateFormat: ""
+      defaultDateTimeFormat: ""
+      defaultRoundMode: ""
+    secureJsonData:
+      basicAuthPassword: password
+    version: 1
+    readOnly: false

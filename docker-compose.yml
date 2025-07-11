@@ -112,6 +112,8 @@ services:
       SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: no
       SPARK_SSL_ENABLED: no
       HOME: /tmp/spark-home
+    depends_on:
+      - clickhouse
     volumes:
       - ./spark/code:/opt/bitnami/spark/apps
       - spark_data:/opt/bitnami/spark/data
@@ -208,12 +210,11 @@ services:
       - 8123:8123
       - 9000:9000
     environment:
-      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
       CLICKHOUSE_PASSWORD: password
-      CLICKHOUSE_DB: default
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./clickhouse/config/users.xml:/etc/clickhouse-server/users.xml:ro
+    #  - ./clickhouse/config/users.xml:/etc/clickhouse-server/users.xml:ro
     ulimits:
       nofile:
         soft: 262144
