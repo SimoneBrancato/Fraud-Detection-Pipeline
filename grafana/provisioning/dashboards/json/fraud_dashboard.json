@@ -1,0 +1,70 @@
+{
+  "id": null,
+  "uid": "fraud-overview",
+  "title": "Fraud Overview",
+  "tags": ["fraud", "transactions"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Totale Transazioni",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 3 },
+      "targets": [
+        {
+          "format": "time_series",
+          "refId": "A",
+          "rawSql": "SELECT count() FROM fraud_predictions",
+          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Transazioni Fraudolente",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 3 },
+      "targets": [
+        {
+          "format": "time_series",
+          "refId": "B",
+          "rawSql": "SELECT count() FROM fraud_predictions WHERE fraud_prediction = 1",
+          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Frodi nel tempo",
+      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "format": "time_series",
+          "refId": "C",
+          "rawSql": "SELECT toStartOfHour(trans_date_trans_time) as time, count() as frauds FROM fraud_predictions WHERE fraud_prediction = 1 GROUP BY time ORDER BY time",
+          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Categorie Frodi",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 5 },
+      "targets": [
+        {
+          "format": "table",
+          "refId": "D",
+          "rawSql": "SELECT category, count() AS count FROM fraud_predictions WHERE fraud_prediction = 1 GROUP BY category ORDER BY count DESC",
+          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
+        }
+      ],
+      "options": {
+        "displayLabels": ["name", "percent"],
+        "legend": {
+          "displayMode": "table"
+        }
+      }
+    }
+  ]
+}
