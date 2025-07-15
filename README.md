@@ -1,4 +1,4 @@
-# Fraud-Detector-Pipeline
+# Fraud Detection Pipeline
 
 A real-time fraud detection system for banking transactions using Apache Kafka, Apache Spark, ClickHouse, and Grafana in a fully dockerized environment.
 
