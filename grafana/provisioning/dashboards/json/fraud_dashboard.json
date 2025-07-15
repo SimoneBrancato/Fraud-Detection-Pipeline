@@ -1,70 +1,761 @@
 {
-  "id": null,
-  "uid": "fraud-overview",
-  "title": "Fraud Overview",
-  "tags": ["fraud", "transactions"],
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "30s",
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
   "panels": [
     {
-      "type": "stat",
-      "title": "Totale Transazioni",
-      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 3 },
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": -1,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "interval": "60s",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "maxHeight": 2,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
           "format": "time_series",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries as t, count()\r\nFROM fraud_predictions \r\nWHERE $timeFilter \r\nGROUP BY t\r\nORDER BY t",
+          "rawQuery": "/* grafana dashboard='FraudS Overview', user='1' */\nSELECT (intDiv(toUInt32(inserted_at), 60) * 60) * 1000 as t, count()\r\nFROM fraud_predictions \r\nWHERE inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752511800) \r\nGROUP BY t\r\nORDER BY t",
           "refId": "A",
-          "rawSql": "SELECT count() FROM fraud_predictions",
-          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Transazioni Fraudolente",
-      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 3 },
-      "targets": [
-        {
-          "format": "time_series",
-          "refId": "B",
-          "rawSql": "SELECT count() FROM fraud_predictions WHERE fraud_prediction = 1",
-          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Frodi nel tempo",
-      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 6 },
-      "targets": [
-        {
-          "format": "time_series",
-          "refId": "C",
-          "rawSql": "SELECT toStartOfHour(trans_date_trans_time) as time, count() as frauds FROM fraud_predictions WHERE fraud_prediction = 1 GROUP BY time ORDER BY time",
-          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
-        }
-      ]
-    },
-    {
-      "type": "piechart",
-      "title": "Categorie Frodi",
-      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 5 },
-      "targets": [
-        {
-          "format": "table",
-          "refId": "D",
-          "rawSql": "SELECT category, count() AS count FROM fraud_predictions WHERE fraud_prediction = 1 GROUP BY category ORDER BY count DESC",
-          "datasource": { "type": "vertamedia-clickhouse-datasource", "uid": "PDEE91DDB90597936" }
+          "round": "0s",
+          "showFormattedSQL": true,
+          "showHelp": true,
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": false
         }
       ],
+      "title": "Transactions Over Time (5 Minutes Interval)",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "id": 1,
       "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": {
-          "displayMode": "table"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "/^count\\(\\)$/",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT now() as t, count() \r\nFROM $table \r\nWHERE $timeFilter\r\n",
+          "rawQuery": "/* grafana dashboard='Fraud Overview', user='1' */\nSELECT now() as t, count() \r\nFROM default.fraud_predictions \r\nWHERE inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752508799)",
+          "rawSql": "SELECT count() FROM fraud_predictions",
+          "refId": "A",
+          "round": "0s",
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": true
         }
-      }
+      ],
+      "title": "Total Transactions",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 7
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT count() FROM fraud_predictions WHERE $timeFilter AND fraud_prediction=1",
+          "rawQuery": "/* grafana dashboard='Fraud Overview', user='1' */\nSELECT count() FROM fraud_predictions WHERE inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752508799) AND fraud_prediction=1",
+          "rawSql": "SELECT count() FROM fraud_predictions WHERE fraud_prediction = 1",
+          "refId": "B",
+          "round": "0s",
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Detected Frauds",
+      "transparent": true,
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr",
+            "seriesBy": "min"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 6,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 20,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "interval": "300s",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries as t, count() \r\nFROM $table \r\nWHERE $timeFilter \r\nAND fraud_prediction=1 \r\nGROUP BY t \r\nORDER BY t",
+          "rawQuery": "/* grafana dashboard='FraudS Overview', user='1' */\nSELECT (intDiv(toUInt32(inserted_at), 60) * 60) * 1000 as t, count() \r\nFROM default.fraud_predictions \r\nWHERE inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752511800) \r\nAND fraud_prediction=1 \r\nGROUP BY t \r\nORDER BY t",
+          "rawSql": "SELECT toStartOfHour(trans_date_trans_time) as time, count() as frauds FROM fraud_predictions WHERE fraud_prediction = 1 GROUP BY time ORDER BY time",
+          "refId": "C",
+          "round": "0s",
+          "showFormattedSQL": true,
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Frauds Over Time",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 9,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": true,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {
+                  "fixed": "dark-red"
+                },
+                "opacity": 0.2,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 3,
+                  "max": 15,
+                  "min": 2
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "location": {
+              "latitude": "lat",
+              "longitude": "long",
+              "mode": "coords"
+            },
+            "name": "Fraud Location",
+            "tooltip": true,
+            "type": "markers"
+          },
+          {
+            "config": {
+              "blur": 15,
+              "radius": 5,
+              "weight": {
+                "fixed": 1,
+                "max": 1,
+                "min": 0
+              }
+            },
+            "location": {
+              "latitude": "lat",
+              "longitude": "long",
+              "mode": "coords"
+            },
+            "name": "Layer 2",
+            "opacity": 0.4,
+            "tooltip": true,
+            "type": "heatmap"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "coords",
+          "lat": 38.931614,
+          "lon": -81.549176,
+          "zoom": 5.26
+        }
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "20",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "select * from fraud_predictions where $timeFilter AND fraud_prediction=1 \r\n",
+          "rawQuery": "/* grafana dashboard='FraudS Overview', user='1' */\nselect * from fraud_predictions where inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752515700) AND fraud_prediction=1",
+          "refId": "A",
+          "round": "0s",
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Fraud Geolocalizations",
+      "transparent": true,
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "PDEE91DDB90597936"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": false,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trans_num"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 303
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "first"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 91
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 142
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "amt"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 65
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 15,
+        "x": 9,
+        "y": 16
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "database": "default",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "PDEE91DDB90597936"
+          },
+          "dateTimeColDataType": "inserted_at",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "formattedQuery": "SELECT $timeSeries as t, count() FROM $table WHERE $timeFilter GROUP BY t ORDER BY t",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT inserted_at, trans_date_trans_time AS timestamp, trans_num, category, first, last, state,amt AS amount, fraud_probability\r\nFROM fraud_predictions\r\nWHERE $timeFilter AND fraud_prediction=1\r\nORDER BY inserted_at",
+          "rawQuery": "/* grafana dashboard='Fraud Overview', user='1' */\nSELECT inserted_at, trans_date_trans_time AS timestamp, trans_num, category, first, last, state,amt AS amount, fraud_probability\r\nFROM fraud_predictions\r\nWHERE inserted_at >= toDateTime(1752506100) AND inserted_at <= toDateTime(1752508799) AND fraud_prediction=1\r\nORDER BY inserted_at",
+          "refId": "A",
+          "round": "0s",
+          "skip_comments": true,
+          "table": "fraud_predictions",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Detected Frauds Informations",
+      "transparent": true,
+      "type": "table"
     }
-  ]
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [
+    "fraud",
+    "transactions"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "2025-07-14T15:15:00.000Z",
+    "to": "2025-07-14T16:50:00.000Z"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FraudS Overview",
+  "uid": "fraud-overview",
+  "version": 1,
+  "weekStart": ""
 }
