@@ -6,6 +6,7 @@ import org.apache.kafka.common.serialization.StringSerializer; // Converts strin
 import java.io.*;
 import java.nio.file.*;
 import java.util.Properties;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ProducerApp {
 
@@ -45,9 +46,9 @@ public class ProducerApp {
             while ((line = reader.readLine()) != null) {
                 String key = "key-" + i;
                 producer.send(new ProducerRecord<>(KAFKA_TOPIC, key, line));
-                // System.out.println("Sent: " + line);
                 i++;
-                Thread.sleep(100); // To simulate a real-time data flow
+
+                Thread.sleep(ThreadLocalRandom.current().nextInt(50, 300)); // To simulate a real-time data flow
             }
         }
 

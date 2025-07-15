@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_csv, when, isnan, isnull
+from pyspark.sql.functions import col, from_csv
 from pyspark.sql.types import *
 import math
 import joblib
@@ -9,7 +9,11 @@ import requests
 
 print("=== Fraud Detection with XGBoost ===")
 
-# Crea SparkSession
+CLICKHOUSE_USER :str = "default"
+CLICKHOUSE_PASSWORD :str = "password"
+CLICKHOUSE_ADDRESS :str = "http://clickhouse:8123"
+
+# Create SparkSession
 spark = SparkSession.builder \
     .appName("FraudDetectionStreaming") \
     .master("spark://spark-master:7077") \
@@ -23,12 +27,12 @@ spark.sparkContext.setLogLevel("WARN")
 print("Loading XGBoost model...")
 model_path = '/opt/bitnami/spark/apps/xgb_full_pipeline.pkl'
 
-# Carica il modello XGBoost
+# Try to load Fraud Detector XGBoost model
 try:
     model_pipeline = joblib.load(model_path)
-    print("✓ XGBoost model loaded successfully")
+    print("XGBoost model loaded successfully")
 except Exception as e:
-    print(f"✗ Error loading model: {e}")
+    print(f"Error loading model: {e}")
     exit(1)
 
 
@@ -81,40 +85,26 @@ def initialize_clickhouse_table():
         SETTINGS index_granularity = 8192
         """
 
-    check_table_sql = "EXISTS TABLE fraud_predictions"
-    check_table_response = requests.post(
-        "http://clickhouse:8123",
-        data=check_table_sql,
-        auth=('default', 'password'),
-        headers={'Content-Type': 'text/plain'}
-    )
-
-    if check_table_response.status_code == 200:
-        table_exists = check_table_response.text.strip() == '1'
-        if table_exists:
-            print("✅ Tabella fraud_predictions già esistente")
-            return True
-
-    print("🔨 Creando tabella fraud_predictions con tutte le colonne...")
+    print("Creating fraud_predictions table in Clickhouse if not exists...")
     response = requests.post(
-        "http://clickhouse:8123",
+        CLICKHOUSE_ADDRESS,
         data=create_table_sql,
-        auth=('default', 'password'),
+        auth=(CLICKHOUSE_USER, CLICKHOUSE_PASSWORD),
         headers={'Content-Type': 'text/plain'}
     )
 
     if response.status_code == 200:
-        print("✅ Tabella fraud_predictions creata con successo")
+        print("Successfully created table fraud_predictions")
         return True
     else:
-        print(f"❌ Errore creazione tabella: {response.text}")
+        print(f"Error while creating table: {response.text}")
         return False
 
 initialize_clickhouse_table()
 
 print("Starting Kafka stream...")
 
-# Legge lo stream da Kafka
+# Connect to Kafka and create stream
 df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka1:9092,kafka2:9092,kafka3:9092") \
@@ -124,16 +114,17 @@ df = spark.readStream \
     .option("failOnDataLoss", "false") \
     .load()
 
-# Decodifica i messaggi Kafka
+# Parse Kafka messages
 parsed_df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)", "timestamp")
 
+# Define csv_schema to read value field
 csv_schema_str = "index string, trans_date_trans_time string, cc_num string," \
 " merchant string, category string, amt double, first string, last string, gender string," \
 " street string, city string, state string, zip string, lat double, long double," \
 " city_pop int, job string, dob string, trans_num string, unix_time int, merch_lat double," \
 " merch_long double, is_fraud int"
 
-# Parsa il CSV
+# Parse csv value to Spark Dataframe and rename columns
 df_csv = parsed_df.select(
     from_csv(col("value"), csv_schema_str, {"header": "false", "inferSchema": "false"}).alias("csv_data")
 ).select(
@@ -161,10 +152,9 @@ df_csv = parsed_df.select(
     col("csv_data.merch_long").alias("merch_long"),
 )
 
-# Define haversine UDF
 def haversine(lat1, lon1, lat2, lon2):
     """
-    Calculate haversine distance between two points
+    Calculates haversine distance between two points, considering Earth radius
     """
     if any(x is None for x in [lat1, lon1, lat2, lon2]):
         return None
@@ -197,12 +187,11 @@ def preprocess_and_predict(batch_df, batch_id):
     
     try:
 
-        # Convert to Pandas per mantenere logica identica
+        # Convert to Pandas DataFrame to maintain the same working logic
         pandas_df = batch_df.toPandas()
         
         pandas_df['idx'] = pandas_df['idx'].astype(int)
 
-        # Applica la funzione originale (adattata)
         pandas_df['dob'] = pd.to_datetime(pandas_df['dob'])
         pandas_df['trans_date_trans_time'] = pd.to_datetime(pandas_df['trans_date_trans_time'])
         pandas_df['age'] = (pandas_df['trans_date_trans_time'] - pandas_df['dob']).dt.days // 365
@@ -211,17 +200,15 @@ def preprocess_and_predict(batch_df, batch_id):
         pandas_df['is_night'] = pandas_df['hour'].apply(lambda x: 1 if x < 6 or x >= 22 else 0).astype(int)
         pandas_df['is_weekend'] = pandas_df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0).astype(int)
         
-        # Distanza (assumendo che haversine sia disponibile)
         pandas_df['distance_user_to_merch'] = pandas_df.apply(
             lambda row: haversine(row['lat'], row['long'], row['merch_lat'], row['merch_long']), axis=1
         )
         
-        # Log transforms
         pandas_df['log_amt'] = np.log1p(pandas_df['amt'])
         pandas_df['log_city_pop'] = np.log1p(pandas_df['city_pop'])
         pandas_df['log_distance'] = np.log1p(pandas_df['distance_user_to_merch'])
         
-        # Statistiche utente SOLO per questo batch
+        # Since the following feature aren't stateless, we consider the state within the batch
         pandas_df['user_id'] = pandas_df['cc_num'].astype(str)
         pandas_df.sort_values(['user_id', 'trans_date_trans_time'], inplace=True)
         pandas_df['tx_count_user'] = pandas_df.groupby('user_id').cumcount()
@@ -229,7 +216,6 @@ def preprocess_and_predict(batch_df, batch_id):
             lambda x: x.rolling(10, min_periods=1).mean()
         )
         
-        # Keep only required columns
         required_columns = [
             'age', 'hour', 'day_of_week', 'is_night', 'is_weekend',
             'log_amt', 'log_city_pop', 'log_distance', 'tx_count_user', 'amt_mean_user',
@@ -238,30 +224,19 @@ def preprocess_and_predict(batch_df, batch_id):
         
         processed_df = pandas_df[required_columns]
 
-        # Applica il modello
-        threshold = 0.3     # In Fraud Detection: Recall >> Precision
-        pandas_df['fraud_probability'] =  model_pipeline.predict_proba(processed_df)[:, 1]
+        threshold = 0.3     # Lower threshold, since in Fraud Detection: Recall >> Precision
+        pandas_df['fraud_probability'] =  model_pipeline.predict_proba(processed_df)[:, 1]      # Apply Fraud Detector Model
         pandas_df['fraud_prediction'] = (pandas_df['fraud_probability'] >= threshold).astype(int)
 
-        fraud_transactions = pandas_df.query('fraud_prediction == 1')
-        if len(fraud_transactions) > 0:
-            print(f"🚨 FRAUD ALERT: {len(fraud_transactions)} fraudulent transactions detected!")
-        else:
-            print("\n✅ No fraud detected in this batch")
-
         result_df = spark.createDataFrame(pandas_df)
-
-        if result_df.count() == 0:
-            print("⚠️ DataFrame vuoto, salto il batch")
-            return
         
         result_df.write \
             .format("jdbc") \
             .option("url", "jdbc:clickhouse://clickhouse:8123/default") \
             .option("driver", "com.clickhouse.jdbc.ClickHouseDriver") \
             .option("dbtable", "fraud_predictions") \
-            .option("user", "default") \
-            .option("password", "password") \
+            .option("user", CLICKHOUSE_USER) \
+            .option("password", CLICKHOUSE_PASSWORD) \
             .mode("append") \
             .save()
 

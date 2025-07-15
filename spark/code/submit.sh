@@ -2,7 +2,7 @@
 
 echo "Waiting for Spark cluster to be ready..."
 
-# Aspetta che il master sia pronto
+# Wait for the master to be ready
 while ! curl -s http://spark-master:8080 > /dev/null 2>&1; do
   echo "Waiting for Spark master..."
   sleep 5
@@ -15,12 +15,12 @@ sleep 30
 
 echo "Starting Spark application..."
 
-# Esegue l'applicazione principale
-
+# Install required dependencies
 pip install xgboost pandas numpy scikit-learn requests &&
 
 sleep 30 &&
 
+# Define Spark-Submit command
 spark-submit \
   --master spark://spark-master:7077 \
   --deploy-mode client \

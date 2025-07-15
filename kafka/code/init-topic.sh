@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Verifica che il nome del topic sia stato fornito
 if [ -z "$KAFKA_TOPIC" ] || [ -z "$KAFKA_BOOTSTRAP_SERVER" ]; then
   echo "[FATAL-ERROR] FATAL ERROR: Environment variables not defined."
   exit 1
