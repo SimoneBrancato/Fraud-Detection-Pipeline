@@ -119,6 +119,13 @@ services:
       - spark_data:/opt/bitnami/spark/data
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
       - ./spark/jars:/opt/spark/jars
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu] 
 
   spark-worker-1:
     image: bitnami/spark:3.5
@@ -140,6 +147,13 @@ services:
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
       - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu] 
    
 
   spark-worker-2:
@@ -162,6 +176,13 @@ services:
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
       - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu] 
 
   spark-worker-3:
     image: bitnami/spark:3.5
@@ -183,6 +204,13 @@ services:
       - ./model/xgb_full_pipeline.pkl:/opt/bitnami/spark/apps/xgb_full_pipeline.pkl
       - ./spark/jars:/opt/spark/jars
     command: ["/bin/bash", "/opt/bitnami/spark/apps/run_workers.sh"]
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu] 
 
   spark-submit:
     image: bitnami/spark:3.5
@@ -202,6 +230,13 @@ services:
       - ./spark/jars:/opt/spark/jars
     command: ["/opt/bitnami/spark/apps/submit.sh"]
     restart: no
+    deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: 1
+                capabilities: [gpu] 
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
